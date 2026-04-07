@@ -2,13 +2,13 @@
   "compilerOptions": {
     "target": "ESNext",
     "module": "ESNext",
-    "moduleResolution": "bundler",
+    "moduleResolution": "node",
     "strict": true,
-    "jsx": "react",
-    "jsxFactory": "h",
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "jsx": "preserve"
   },
   "include": ["src"]
 }

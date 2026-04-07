@@ -1,0 +1,16 @@
+{
+  "name": "shy",
+  "version": "0.1.0",
+  "description": "S = State, Hy = Hyperscript & Hydration",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --minify",
+    "dev": "tsup src/index.ts --format esm,cjs --watch"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3"
+  }
+}
