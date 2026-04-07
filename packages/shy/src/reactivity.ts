@@ -4,7 +4,7 @@ let currentEffect: EffectFn | null = null;
 const effectDependencies = new WeakMap<EffectFn, Set<Set<EffectFn>>>();
 const effectCleanups = new WeakMap<EffectFn, Set<() => void>>();
 
-export function untrack<T>(fn: () => T): T {
+export function ut<T>(fn: () => T): T {
   const prevEffect = currentEffect;
   currentEffect = null;
   try {
@@ -14,7 +14,7 @@ export function untrack<T>(fn: () => T): T {
   }
 }
 
-export function onCleanup(fn: () => void) {
+export function off(fn: () => void) {
   if (currentEffect) {
     let cleanups = effectCleanups.get(currentEffect);
     if (!cleanups) {
@@ -103,7 +103,7 @@ export function eff(fn: () => void | (() => void)): () => void {
     try {
       const cleanup = fn();
       if (typeof cleanup === 'function') {
-        onCleanup(cleanup);
+        off(cleanup);
       }
     } finally {
       currentEffect = prevEffect;
@@ -111,7 +111,7 @@ export function eff(fn: () => void | (() => void)): () => void {
   };
   
   if (currentEffect) {
-    onCleanup(() => cleanupEffect(effect));
+    off(() => cleanupEffect(effect));
   }
   
   effect();

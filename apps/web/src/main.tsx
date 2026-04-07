@@ -1,10 +1,10 @@
-import { s, eff, For, createContext, provide, inject, onCleanup } from 'shy';
+import { s, eff, For, ctx, prv, inj, off } from 'shy';
 
 // Test Context
-const ThemeContext = createContext("light");
+const ThemeContext = ctx("light");
 
 function ThemedText(props: { text: string }) {
-  const theme = inject(ThemeContext);
+  const theme = inj(ThemeContext);
   return (
     <span style={() => ({ color: theme() === "dark" ? "white" : "black", background: theme() === "dark" ? "#333" : "#eee", padding: "4px" })}>
       {props.text}
@@ -23,7 +23,7 @@ function Counter() {
     const interval = setInterval(() => {
       console.log("Interval running for count:", count());
     }, 1000);
-    onCleanup(() => {
+    off(() => {
       console.log("Cleanup for count:", count());
       clearInterval(interval);
     });
@@ -55,7 +55,7 @@ function Counter() {
     // Should only trigger the effect once because of microtask batching
   };
 
-  return provide(ThemeContext, theme, () => (
+  return prv(ThemeContext, theme, () => (
     <div ref={(el: HTMLDivElement) => (myRef = el)} className="container" style={() => ({ background: theme() === "dark" ? "#222" : "#fff", color: theme() === "dark" ? "#fff" : "#000" })}>
       <h1>
         Counter with SHy.js

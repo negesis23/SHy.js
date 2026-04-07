@@ -1,6 +1,19 @@
-import { eff, onCleanup, untrack } from "./reactivity";
+import { eff, off, ut } from "./reactivity";
 
 const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
+
+const SVG_TAGS = new Set([
+  "svg", "animate", "animateMotion", "animateTransform", "circle", "clipPath",
+  "defs", "desc", "ellipse", "feBlend", "feColorMatrix", "feComponentTransfer",
+  "feComposite", "feConvolveMatrix", "feDiffuseLighting", "feDisplacementMap",
+  "feDistantLight", "feDropShadow", "feFlood", "feFuncA", "feFuncB", "feFuncG",
+  "feFuncR", "feGaussianBlur", "feImage", "feMerge", "feMergeNode", "feMorphology",
+  "feOffset", "fePointLight", "feSpecularLighting", "feSpotLight", "feTile",
+  "feTurbulence", "filter", "foreignObject", "g", "image", "line", "linearGradient",
+  "marker", "mask", "metadata", "mpath", "path", "pattern", "polygon", "polyline",
+  "radialGradient", "rect", "stop", "switch", "symbol", "text", "textPath",
+  "tspan", "use", "view"
+]);
 
 const templateCache = new Map<string, Element>();
 
@@ -9,7 +22,7 @@ export function h(tag: string | Function | any, props: any, ...children: any[]) 
     return tag({ ...props, children });
   }
 
-  const isSvg = tag === "svg" || (props && props.xmlns === SVG_NAMESPACE);
+  const isSvg = SVG_TAGS.has(tag) || (props && props.xmlns === SVG_NAMESPACE);
   let el: Element;
   const cacheKey = isSvg ? `svg:${tag}` : tag;
   let cached = templateCache.get(cacheKey);
@@ -107,7 +120,7 @@ function appEl(parent: Element | DocumentFragment | Node, child: any, isSvg: boo
         if (fallback && !isFallback) {
           isFallback = true;
           const frag = document.createDocumentFragment();
-          untrack(() => {
+          ut(() => {
             fallbackDispose = eff(() => {
               const fbChild = typeof fallback === "function" ? fallback() : fallback;
               appEl(frag, fbChild, isSvg);
@@ -127,7 +140,7 @@ function appEl(parent: Element | DocumentFragment | Node, child: any, isSvg: boo
           } else {
             const frag = document.createDocumentFragment();
             let dispose!: () => void;
-            untrack(() => {
+            ut(() => {
               dispose = eff(() => {
                 const el = renderItem(item, () => list.indexOf(item));
                 appEl(frag, el, isSvg);
@@ -142,7 +155,7 @@ function appEl(parent: Element | DocumentFragment | Node, child: any, isSvg: boo
       renderedItemsMap = newRenderedItemsMap;
     });
 
-    onCleanup(() => {
+    off(() => {
       listEffDispose();
       if (fallbackDispose) fallbackDispose();
       for (const rendered of renderedItemsMap.values()) {
@@ -219,11 +232,11 @@ export interface Context<T> {
 
 let contextProviderMap = new Map<symbol, any>();
 
-export function createContext<T>(defaultValue?: T): Context<T> {
+export function ctx<T>(defaultValue?: T): Context<T> {
   return { id: Symbol("context"), defaultValue };
 }
 
-export function provide<T>(context: Context<T>, value: T, fn: () => any) {
+export function prv<T>(context: Context<T>, value: T, fn: () => any) {
   const prevMap = contextProviderMap;
   contextProviderMap = new Map(prevMap);
   contextProviderMap.set(context.id, value);
@@ -232,7 +245,7 @@ export function provide<T>(context: Context<T>, value: T, fn: () => any) {
   return result;
 }
 
-export function inject<T>(context: Context<T>): T {
+export function inj<T>(context: Context<T>): T {
   if (contextProviderMap.has(context.id)) {
     return contextProviderMap.get(context.id);
   }
