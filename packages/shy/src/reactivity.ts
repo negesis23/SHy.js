@@ -1,13 +1,82 @@
-let context: (() => void)[] = [];
+type EffectFn = () => void;
+
+let currentEffect: EffectFn | null = null;
+const effectDependencies = new WeakMap<EffectFn, Set<Set<EffectFn>>>();
+const effectCleanups = new WeakMap<EffectFn, Set<() => void>>();
+
+export function untrack<T>(fn: () => T): T {
+  const prevEffect = currentEffect;
+  currentEffect = null;
+  try {
+    return fn();
+  } finally {
+    currentEffect = prevEffect;
+  }
+}
+
+export function onCleanup(fn: () => void) {
+  if (currentEffect) {
+    let cleanups = effectCleanups.get(currentEffect);
+    if (!cleanups) {
+      cleanups = new Set();
+      effectCleanups.set(currentEffect, cleanups);
+    }
+    cleanups.add(fn);
+  }
+}
+
+function cleanupEffect(effect: EffectFn) {
+  const deps = effectDependencies.get(effect);
+  if (deps) {
+    for (const dep of deps) {
+      dep.delete(effect);
+    }
+    deps.clear();
+  }
+  const cleanups = effectCleanups.get(effect);
+  if (cleanups) {
+    for (const cleanup of cleanups) {
+      cleanup();
+    }
+    cleanups.clear();
+  }
+}
+
+const pendingEffects = new Set<EffectFn>();
+let microtaskQueued = false;
+
+function notifyEffect(subscriber: EffectFn) {
+  if ((subscriber as any).$$isMemo) {
+    subscriber();
+  } else {
+    pendingEffects.add(subscriber);
+    if (!microtaskQueued) {
+      microtaskQueued = true;
+      Promise.resolve().then(() => {
+        microtaskQueued = false;
+        const effectsToRun = Array.from(pendingEffects);
+        pendingEffects.clear();
+        for (const eff of effectsToRun) {
+          eff();
+        }
+      });
+    }
+  }
+}
 
 export function s<T>(initialValue: T): [() => T, (v: T | ((prev: T) => T)) => void] {
   let value = initialValue;
-  const subscribers = new Set<() => void>();
+  const subscribers = new Set<EffectFn>();
 
   const get = () => {
-    const currentObserver = context[context.length - 1];
-    if (currentObserver) {
-      subscribers.add(currentObserver);
+    if (currentEffect) {
+      subscribers.add(currentEffect);
+      let deps = effectDependencies.get(currentEffect);
+      if (!deps) {
+        deps = new Set();
+        effectDependencies.set(currentEffect, deps);
+      }
+      deps.add(subscribers);
     }
     return value;
   };
@@ -16,8 +85,9 @@ export function s<T>(initialValue: T): [() => T, (v: T | ((prev: T) => T)) => vo
     const nextValue = typeof newValue === "function" ? (newValue as any)(value) : newValue;
     if (nextValue !== value) {
       value = nextValue;
-      for (const subscriber of subscribers) {
-        subscriber();
+      const subs = Array.from(subscribers);
+      for (const subscriber of subs) {
+        notifyEffect(subscriber);
       }
     }
   };
@@ -25,21 +95,68 @@ export function s<T>(initialValue: T): [() => T, (v: T | ((prev: T) => T)) => vo
   return [get, set];
 }
 
-export function eff(fn: () => void | (() => void)) {
-  let cleanup: void | (() => void);
+export function eff(fn: () => void | (() => void)): () => void {
   const effect = () => {
-    if (cleanup) cleanup();
-    context.push(effect);
-    cleanup = fn();
-    context.pop();
+    cleanupEffect(effect);
+    const prevEffect = currentEffect;
+    currentEffect = effect;
+    try {
+      const cleanup = fn();
+      if (typeof cleanup === 'function') {
+        onCleanup(cleanup);
+      }
+    } finally {
+      currentEffect = prevEffect;
+    }
   };
+  
+  if (currentEffect) {
+    onCleanup(() => cleanupEffect(effect));
+  }
+  
   effect();
+  return () => cleanupEffect(effect);
 }
 
 export function mem<T>(fn: () => T): () => T {
-  const [get, set] = s<T>(undefined as any);
-  eff(() => {
-    set(fn());
-  });
+  let value: T;
+  let isDirty = true;
+  const subscribers = new Set<EffectFn>();
+
+  const effect = () => {
+    if (isDirty) return;
+    isDirty = true;
+    const subs = Array.from(subscribers);
+    for (const subscriber of subs) {
+      notifyEffect(subscriber);
+    }
+  };
+  (effect as any).$$isMemo = true;
+
+  const get = () => {
+    if (isDirty) {
+      cleanupEffect(effect);
+      const prevEffect = currentEffect;
+      currentEffect = effect;
+      try {
+        value = fn();
+      } finally {
+        currentEffect = prevEffect;
+      }
+      isDirty = false;
+    }
+
+    if (currentEffect) {
+      subscribers.add(currentEffect);
+      let deps = effectDependencies.get(currentEffect);
+      if (!deps) {
+        deps = new Set();
+        effectDependencies.set(currentEffect, deps);
+      }
+      deps.add(subscribers);
+    }
+    return value;
+  };
+
   return get;
 }
