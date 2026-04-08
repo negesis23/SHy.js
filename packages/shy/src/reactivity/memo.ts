@@ -5,7 +5,7 @@ export function mem<T>(fn: () => T): () => T {
     let isDirty = true;
     const subscribers = new Set<EffectFn>();
 
-    const effect = () => {
+    const effect: EffectFn = () => {
     if (isDirty) return;
     isDirty = true;
     const subs = Array.from(subscribers);
@@ -13,7 +13,7 @@ export function mem<T>(fn: () => T): () => T {
       notifyEffect(subscriber);
     }
     };
-    (effect as any).$$isMemo = true;
+    effect.$$isMemo = true;
 
     const get = () => {
     if (isDirty) {
@@ -42,3 +42,5 @@ export function mem<T>(fn: () => T): () => T {
 
     return get;
 }
+
+export const createMemo = mem;

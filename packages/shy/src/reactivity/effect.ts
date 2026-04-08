@@ -30,6 +30,8 @@ export function eff(fn: () => void | (() => void)): () => void {
     return () => cleanupEffect(effect);
 }
 
+export const createEffect = eff;
+
 export function ut<T>(fn: () => T): T {
     const prevEffect = currentEffect;
     setCurrentEffect(null);
@@ -39,6 +41,8 @@ export function ut<T>(fn: () => T): T {
     setCurrentEffect(prevEffect);
     }
 }
+
+export const untrack = ut;
 
 export function off(fn: () => void) {
     if (currentEffect) {
@@ -50,3 +54,5 @@ export function off(fn: () => void) {
     cleanups.add(fn);
     }
 }
+
+export const onCleanup = off;

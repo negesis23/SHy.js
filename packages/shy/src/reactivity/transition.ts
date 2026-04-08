@@ -25,3 +25,5 @@ export function trn(): [() => boolean, (cb: () => void) => void] {
 
   return [pending, startTransition];
 }
+
+export const useTransition = trn;
