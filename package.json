@@ -8,6 +8,7 @@
     "check-types": "turbo run check-types"
   },
   "devDependencies": {
+    "ts-morph": "^27.0.2",
     "turbo": "^2.9.4",
     "typescript": "5.9.2"
   },
