@@ -63,8 +63,13 @@ export function res<T, S = true>(
 
   const resourceFn = (() => {
     const suspense = inj(SuspenseContext);
-    if (loading() && suspense && currentPromise) {
-      suspense.register(currentPromise);
+    if (loading() && currentPromise) {
+      if (suspense) {
+        suspense.register(currentPromise);
+        throw currentPromise;
+      }
+      // If we are in a transition, we should also suspend
+      // but without a Suspense boundary, maybe we just return data() ?
     }
     return data();
   }) as Resource<T>;

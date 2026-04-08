@@ -1,7 +1,7 @@
 import { prv } from "../context";
 import { s } from "../reactivity/signal";
 import { SuspenseContext } from "../reactivity/resource";
-import { eff, ut } from "../reactivity/effect";
+import { pushErrorHandler, popErrorHandler } from "../reactivity/core";
 
 export function Suspense(props: { fallback: any, children: any }) {
   const [loading, setLoading] = s(false);
@@ -23,8 +23,24 @@ export function Suspense(props: { fallback: any, children: any }) {
     if (loading()) {
       return props.fallback;
     }
-    return prv(SuspenseContext, { register }, () => {
-      return props.children;
+    
+    pushErrorHandler((err) => {
+      if (err instanceof Promise) {
+        register(err);
+      } else {
+        throw err;
+      }
     });
+
+    let result;
+    try {
+      result = prv(SuspenseContext, { register }, () => {
+        return typeof props.children === "function" ? props.children() : props.children;
+      });
+    } finally {
+      popErrorHandler();
+    }
+    
+    return result;
   };
 }

@@ -60,6 +60,14 @@ export function h(tag: string | Function | any, props: any, ...children: any[]) 
     for (const key in props) {
       if (key === "ref" && typeof props[key] === "function") {
         props[key](el);
+      } else if (key === "use" && Array.isArray(props[key])) {
+        for (const item of props[key]) {
+          if (Array.isArray(item)) {
+            item[0](el, () => item[1]);
+          } else if (typeof item === "function") {
+            item(el, () => undefined);
+          }
+        }
       } else if (key.startsWith("on")) {
         const name = key.slice(2).toLowerCase();
         if (DELEGATED_EVENTS.has(name)) {

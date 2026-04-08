@@ -49,7 +49,11 @@ export function runInErrorHandler(fn: () => void) {
     if (errorHandlers.length > 0) {
       errorHandlers[errorHandlers.length - 1](err);
     } else {
-      console.error("SHy.js: Uncaught error in effect", err);
+      if (err instanceof Promise) {
+        console.error("SHy.js: Uncaught Promise (missing Suspense boundary)", err);
+      } else {
+        console.error("SHy.js: Uncaught error in effect", err);
+      }
     }
   }
 }

@@ -5,8 +5,20 @@ import { handleIndex } from "../components/Index";
 export function setAttribute(el: Element, key: string, value: any) {
     if (key === "className") {
     el.setAttribute("class", value);
+    } else if (key === "classList" && typeof value === "object") {
+        for (const name in value) {
+            if (value[name]) el.classList.add(name);
+            else el.classList.remove(name);
+        }
     } else if (key === "style" && typeof value === "object") {
-    Object.assign((el as HTMLElement).style, value);
+        const prev = (el as any)._prevStyle || {};
+        for (const k in prev) {
+            if (!(k in value)) (el as HTMLElement).style.removeProperty(k);
+        }
+        for (const k in value) {
+            (el as HTMLElement).style.setProperty(k, value[k]);
+        }
+        (el as any)._prevStyle = value;
     } else if (value == null || value === false) {
     el.removeAttribute(key);
     } else {

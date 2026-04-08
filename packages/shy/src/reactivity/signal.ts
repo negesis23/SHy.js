@@ -38,6 +38,19 @@ function isObject(val: unknown): val is object {
   return val !== null && typeof val === "object";
 }
 
+const arrayInstrumentations: Record<string, Function> = {};
+['push', 'pop', 'shift', 'unshift', 'splice'].forEach(method => {
+  const original = (Array.prototype as any)[method];
+  arrayInstrumentations[method] = function (this: unknown[], ...args: unknown[]) {
+    // Execute original array method
+    const res = original.apply(this, args);
+    // Trigger the length and the root array object, bypassing individual index triggers during the operation
+    // For optimal performance, we just trigger the 'length' property directly which triggers components like <For>
+    triggerProperty(this, 'length');
+    return res;
+  };
+});
+
 function createReactiveProxy<T extends object>(target: T): T {
   if (proxyMap.has(target)) {
     return proxyMap.get(target) as T;
@@ -45,6 +58,9 @@ function createReactiveProxy<T extends object>(target: T): T {
 
   const proxy = new Proxy(target, {
     get(obj, key, receiver) {
+      if (Array.isArray(obj) && Object.prototype.hasOwnProperty.call(arrayInstrumentations, key)) {
+        return Reflect.get(arrayInstrumentations, key, receiver);
+      }
       trackProperty(obj, key);
       const res = Reflect.get(obj, key, receiver);
       // Lazy deep reactivity: wrap nested objects only when they are accessed

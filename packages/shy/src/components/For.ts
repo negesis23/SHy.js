@@ -53,12 +53,24 @@ export function handleFor(parent: Element | DocumentFragment | Node, child: any,
           marker.parentNode?.insertBefore(frag, marker);
         }
       } else {
-        for (const item of list) {
+        // O(1) insertion optimizations: only move nodes if they are out of place
+        let lastNode: Node | null = marker;
+        for (let i = list.length - 1; i >= 0; i--) {
+          const item = list[i];
           const existing = renderedItemsMap.get(item);
           if (existing) {
             newRenderedItemsMap.set(item, existing);
-            for (const node of existing.nodes) {
-              marker.parentNode?.insertBefore(node, marker);
+            const firstExistingNode = existing.nodes[0];
+            const lastExistingNode = existing.nodes[existing.nodes.length - 1];
+            
+            // Check if it's already in the correct position (immediately preceding lastNode)
+            if (lastExistingNode && lastExistingNode.nextSibling !== lastNode) {
+               for (const node of existing.nodes) {
+                 lastNode!.parentNode?.insertBefore(node, lastNode);
+               }
+            }
+            if (firstExistingNode) {
+              lastNode = firstExistingNode;
             }
           } else {
             const frag = document.createDocumentFragment();
@@ -70,7 +82,10 @@ export function handleFor(parent: Element | DocumentFragment | Node, child: any,
               });
             });
             const itemNodes = Array.from(frag.childNodes);
-            marker.parentNode?.insertBefore(frag, marker);
+            if (itemNodes.length > 0) {
+               lastNode!.parentNode?.insertBefore(frag, lastNode);
+               lastNode = itemNodes[0];
+            }
             newRenderedItemsMap.set(item, { nodes: itemNodes, dispose });
           }
         }
