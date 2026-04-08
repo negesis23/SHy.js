@@ -8,6 +8,13 @@
 			"problemMatcher": [],
 			"label": "npm: build",
 			"detail": "turbo run build"
+		},
+		{
+			"type": "npm",
+			"script": "dev",
+			"problemMatcher": [],
+			"label": "npm: dev",
+			"detail": "turbo run dev"
 		}
 	]
 }
