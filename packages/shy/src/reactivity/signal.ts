@@ -80,6 +80,7 @@ function createReactiveProxy<T extends object>(target: T): T {
 function deepMerge(target: any, source: any) {
   if (!isObject(target) || !isObject(source)) return source;
   for (const key of Object.keys(source)) {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
     if (isObject(source[key]) && isObject(target[key]) && !Array.isArray(source[key])) {
       deepMerge(target[key], source[key]);
     } else {
@@ -95,12 +96,15 @@ function applyPathSet(target: any, path: string, value: any) {
   let current = target;
   for (let i = 0; i < keys.length - 1; i++) {
     const key = keys[i];
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') return;
     if (!isObject(current[key])) {
       current[key] = {};
     }
     current = current[key];
   }
-  current[keys[keys.length - 1]] = value;
+  const lastKey = keys[keys.length - 1];
+  if (lastKey === '__proto__' || lastKey === 'constructor' || lastKey === 'prototype') return;
+  current[lastKey] = value;
 }
 
 // --- Unified Signal API ---
