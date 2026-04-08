@@ -1,43 +1,34 @@
-import { EffectFn, currentEffect, setCurrentEffect, effectDependencies, cleanupEffect, notifyEffect } from "./core";
+import { EffectFn, currentEffect, setCurrentEffect, cleanupEffect, SignalNode, track, trigger } from "./core";
 
 export function mem<T>(fn: () => T): () => T {
     let value: T;
     let isDirty = true;
-    const subscribers = new Set<EffectFn>();
+    
+    // Memo acts as a source
+    const node: SignalNode = { firstEdge: null };
 
     const effect: EffectFn = () => {
-    if (isDirty) return;
-    isDirty = true;
-    const subs = Array.from(subscribers);
-    for (const subscriber of subs) {
-      notifyEffect(subscriber);
-    }
+        if (isDirty) return;
+        isDirty = true;
+        trigger(node);
     };
     effect.$$isMemo = true;
 
     const get = () => {
-    if (isDirty) {
-      cleanupEffect(effect);
-      const prevEffect = currentEffect;
-      setCurrentEffect(effect);
-      try {
-        value = fn();
-      } finally {
-        setCurrentEffect(prevEffect);
-      }
-      isDirty = false;
-    }
+        if (isDirty) {
+            cleanupEffect(effect);
+            const prevEffect = currentEffect;
+            setCurrentEffect(effect);
+            try {
+                value = fn();
+            } finally {
+                setCurrentEffect(prevEffect);
+            }
+            isDirty = false;
+        }
 
-    if (currentEffect) {
-      subscribers.add(currentEffect);
-      let deps = effectDependencies.get(currentEffect);
-      if (!deps) {
-        deps = new Set();
-        effectDependencies.set(currentEffect, deps);
-      }
-      deps.add(subscribers);
-    }
-    return value;
+        track(node);
+        return value;
     };
 
     return get;

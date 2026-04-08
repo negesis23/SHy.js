@@ -1,10 +1,10 @@
-import { EffectFn, currentEffect, effectDependencies, notifyEffect } from "./core";
+import { currentEffect, track, trigger, SignalNode } from "./core";
 
 // --- Proxy Reactivity Engine (Membrane) ---
 
-// Stores subscribers for object properties: Target -> Property -> Set<EffectFn>
+// Stores SignalNodes for object properties: Target -> Property -> SignalNode
 // Uses WeakMap to prevent memory leaks, ensuring the target object remains pure.
-const targetMap = new WeakMap<object, Map<string | symbol, Set<EffectFn>>>();
+const targetMap = new WeakMap<object, Map<string | symbol, SignalNode>>();
 
 // Cache to avoid recreating proxies for the same object
 const proxyMap = new WeakMap<object, object>();
@@ -16,32 +16,21 @@ function trackProperty(target: object, key: string | symbol) {
       depsMap = new Map();
       targetMap.set(target, depsMap);
     }
-    let dep = depsMap.get(key);
-    if (!dep) {
-      dep = new Set();
-      depsMap.set(key, dep);
+    let node = depsMap.get(key);
+    if (!node) {
+      node = { firstEdge: null };
+      depsMap.set(key, node);
     }
-    dep.add(currentEffect);
-    
-    let effectDeps = effectDependencies.get(currentEffect);
-    if (!effectDeps) {
-      effectDeps = new Set();
-      effectDependencies.set(currentEffect, effectDeps);
-    }
-    effectDeps.add(dep);
+    track(node);
   }
 }
 
 function triggerProperty(target: object, key: string | symbol) {
   const depsMap = targetMap.get(target);
   if (!depsMap) return;
-  const dep = depsMap.get(key);
-  if (dep) {
-    // Clone set to avoid infinite loops if effects cause more triggers
-    const subs = Array.from(dep);
-    for (const subscriber of subs) {
-      notifyEffect(subscriber);
-    }
+  const node = depsMap.get(key);
+  if (node) {
+    trigger(node);
   }
 }
 
@@ -131,20 +120,11 @@ export function s<T>(initialValue: T): [() => T, any] {
   let value = initialValue;
   let proxyValue = isObj ? createReactiveProxy(initialValue as object) : initialValue;
   
-  // Root subscribers are used for primitives, or when the entire object reference is replaced
-  const rootSubscribers = new Set<EffectFn>();
+  // Root node used for primitives, or when the entire object reference is replaced
+  const rootNode: SignalNode = { firstEdge: null };
 
   const get = (): T => {
-    // If it's a primitive or they access the root proxy reference
-    if (currentEffect) {
-      rootSubscribers.add(currentEffect);
-      let deps = effectDependencies.get(currentEffect);
-      if (!deps) {
-        deps = new Set();
-        effectDependencies.set(currentEffect, deps);
-      }
-      deps.add(rootSubscribers);
-    }
+    track(rootNode);
     return (isObj ? proxyValue : value) as T;
   };
 
@@ -163,19 +143,17 @@ export function s<T>(initialValue: T): [() => T, any] {
              value = nextValue;
              isObj = isObject(value);
              proxyValue = isObj ? createReactiveProxy(value as object) : value;
-             const subs = Array.from(rootSubscribers);
-             for (const sub of subs) notifyEffect(sub);
+             trigger(rootNode);
           }
         } else if (isObject(arg) && !Array.isArray(arg) && !Array.isArray(value)) {
-          // Option A: Patch Setter -> setUser({ name: 'B' }) (Only applies if both are pure objects)
+          // Option A: Patch Setter -> setUser({ name: 'B' })
           deepMerge(proxyValue, arg); // mutates proxy, triggers automatically via properties
         } else {
           // Full replacement with a new object/primitive
           value = arg;
           isObj = isObject(value);
           proxyValue = isObj ? createReactiveProxy(value as object) : value;
-          const subs = Array.from(rootSubscribers);
-          for (const sub of subs) notifyEffect(sub);
+          trigger(rootNode);
         }
       }
     } else {
@@ -188,10 +166,7 @@ export function s<T>(initialValue: T): [() => T, any] {
         if (isObj) {
            proxyValue = createReactiveProxy(value as object);
         }
-        const subs = Array.from(rootSubscribers);
-        for (const subscriber of subs) {
-          notifyEffect(subscriber);
-        }
+        trigger(rootNode);
       }
     }
   };
