@@ -1,5 +1,5 @@
 import { setAttribute, appEl } from "./reconciler";
-import { eff } from "./reactivity";
+import { eff } from "../reactivity/index";
 
 export const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 export const SVG_TAGS = new Set([
