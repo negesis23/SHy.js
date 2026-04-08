@@ -1,0 +1,35 @@
+{
+  "session": {
+    "id": "20260408_065408",
+    "token": "not_required"
+  },
+  "assessments": {
+    "cross_module_architecture": 65.0
+  },
+  "findings": [
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "global_mutable_state_hub",
+      "summary": "Shared mutable state in core reactivity module creates high coupling and initialization side effects.",
+      "related_files": ["packages/shy/src/reactivity/core.ts"],
+      "evidence": [
+        "Global exported variables: currentEffect, errorHandlers, pendingEffects, transitionEffects, microtaskQueued, isTransitioning",
+        "Multiple functions (pushErrorHandler, setCurrentEffect, setTransitioning) mutate these globals directly."
+      ],
+      "suggestion": "Encapsulate reactivity state within a \u0027Root\u0027 or \u0027Context\u0027 object to allow multiple independent reactivity instances and avoid side effects on module import.",
+      "confidence": "high"
+    },
+    {
+      "dimension": "cross_module_architecture",
+      "identifier": "excessive_barrel_exports",
+      "summary": "Root and subdirectory barrel files obscure module boundaries and promote tight coupling.",
+      "related_files": ["packages/shy/src/index.ts", "packages/shy/src/reactivity/index.ts"],
+      "evidence": [
+        "index.ts re-exports everything from all subdirectories, including internal implementation details like \u0027core\u0027.",
+        "This pattern encourages consumers to import from the root, making it harder to track dependency flow."
+      ],
+      "suggestion": "Limit barrel exports to the public API only. Internal modules should import from specific files to prevent circularity and clarify boundaries.",
+      "confidence": "medium"
+    }
+  ]
+}

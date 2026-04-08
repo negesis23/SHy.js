@@ -7,12 +7,12 @@ export interface Resource<T> {
   (): T | undefined;
   data: () => T | undefined;
   loading: () => boolean;
-  error: () => any;
+  error: () => unknown;
   refetch: () => void;
 }
 
 const SuspenseContext = ctx<{
-  register: (promise: Promise<any>) => void;
+  register: (promise: Promise<unknown>) => void;
 } | null>(null);
 
 export { SuspenseContext };
@@ -23,17 +23,17 @@ export function res<T, S = true>(
 ): Resource<T> {
   const [data, setData] = s<T | undefined>(undefined);
   const [loading, setLoading] = s(false);
-  const [error, setError] = s<any>(undefined);
+  const [error, setError] = s<unknown>(undefined);
   
   let currentPromise: Promise<T> | null = null;
 
-  function load(sVal: any) {
+  function load(sVal: S | true) {
     if (sVal === false || sVal === null || sVal === undefined) return;
 
     setLoading(true);
     setError(undefined);
     
-    const promise = fetcher(sVal as any);
+    const promise = (fetcher as (s: S | true) => Promise<T>)(sVal);
     currentPromise = promise;
     
     promise.then(
@@ -43,7 +43,7 @@ export function res<T, S = true>(
           setLoading(false);
         }
       },
-      (err) => {
+      (err: unknown) => {
         if (currentPromise === promise) {
           setError(() => err);
           setLoading(false);
@@ -61,18 +61,18 @@ export function res<T, S = true>(
     load(true);
   }
 
-  const res: any = () => {
+  const resourceFn = (() => {
     const suspense = inj(SuspenseContext);
     if (loading() && suspense && currentPromise) {
       suspense.register(currentPromise);
     }
     return data();
-  };
+  }) as Resource<T>;
 
-  res.data = () => res();
-  res.loading = loading;
-  res.error = error;
-  res.refetch = () => {
+  resourceFn.data = () => resourceFn();
+  resourceFn.loading = loading;
+  resourceFn.error = error;
+  resourceFn.refetch = () => {
     if (source) {
         load(source());
     } else {
@@ -80,5 +80,7 @@ export function res<T, S = true>(
     }
   };
 
-  return res as Resource<T>;
+  return resourceFn;
 }
+
+export const createResource = res;
