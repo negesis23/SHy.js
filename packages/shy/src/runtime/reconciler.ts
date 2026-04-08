@@ -1,5 +1,6 @@
 import { eff, off, ut } from "../reactivity/index";
 import { handleFor } from "../components/For";
+import { handleIndex } from "../components/Index";
 
 export function setAttribute(el: Element, key: string, value: any) {
     if (key === "className") {
@@ -29,13 +30,22 @@ export function appEl(parent: Element | DocumentFragment | Node, child: any, isS
         return;
     }
 
+    if (child && child.$$isIndex) {
+        handleIndex(parent, child, isSvg);
+        return;
+    }
+
     if (typeof child === "function") {
     const marker = document.createComment("marker");
     parent.appendChild(marker);
     let currentNodes: Node[] = [];
 
     eff(() => {
-      const val = child();
+      let val = child();
+      // Handle nested thunks (e.g. Suspense inside prv)
+      while (typeof val === "function" && !val.$$isShy) {
+        val = val();
+      }
       
       const isPrimitive = typeof val === "string" || typeof val === "number" || typeof val === "boolean";
       if (isPrimitive && currentNodes.length === 1 && currentNodes[0].nodeType === Node.TEXT_NODE) {

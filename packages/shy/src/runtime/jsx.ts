@@ -3,44 +3,71 @@ import { eff } from "../reactivity/index";
 
 export const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 export const SVG_TAGS = new Set([
-      "svg", "animate", "animateMotion", "animateTransform", "circle", "clipPath",
-      "defs", "desc", "ellipse", "feBlend", "feColorMatrix", "feComponentTransfer",
-      "feComposite", "feConvolveMatrix", "feDiffuseLighting", "feDisplacementMap",
-      "feDistantLight", "feDropShadow", "feFlood", "feFuncA", "feFuncB", "feFuncG",
-      "feFuncR", "feGaussianBlur", "feImage", "feMerge", "feMergeNode", "feMorphology",
-      "feOffset", "fePointLight", "feSpecularLighting", "feSpotLight", "feTile",
-      "feTurbulence", "filter", "foreignObject", "g", "image", "line", "linearGradient",
-      "marker", "mask", "metadata", "mpath", "path", "pattern", "polygon", "polyline",
-      "radialGradient", "rect", "stop", "switch", "symbol", "text", "textPath",
-      "tspan", "use", "view"
-    ]);
+  "svg", "animate", "animateMotion", "animateTransform", "circle", "clipPath",
+  "defs", "desc", "ellipse", "feBlend", "feColorMatrix", "feComponentTransfer",
+  "feComposite", "feConvolveMatrix", "feDiffuseLighting", "feDropShadow", "feFlood",
+  "feFuncA", "feFuncB", "feFuncG", "feFuncR", "feGaussianBlur", "feImage", "feMerge",
+  "feMergeNode", "feMorphology", "feOffset", "fePointLight", "feSpecularLighting",
+  "feSpotLight", "feTile", "feTurbulence", "filter", "foreignObject", "g", "image",
+  "line", "linearGradient", "marker", "mask", "metadata", "mpath", "path", "pattern",
+  "polygon", "polyline", "radialGradient", "rect", "stop", "switch", "symbol", "text",
+  "textPath", "tspan", "use", "view"
+]);
+
+const DELEGATED_EVENTS = new Set(["click", "input", "change", "submit", "focus", "blur", "keydown", "keyup", "keypress"]);
+
 export const templateCache = new Map<string, Element>();
 
-export function h(tag: string | Function | any, props: any, ...children: any[]) {
-    if (typeof tag === "function") {
-    return tag({ ...props, children });
-    }
+const eventListeners = new Set<string>();
 
-    const isSvg = SVG_TAGS.has(tag) || (props && props.xmlns === SVG_NAMESPACE);
-    let el: Element;
-    const cacheKey = isSvg ? `svg:${tag}` : tag;
-    let cached = templateCache.get(cacheKey);
-    if (!cached) {
+function delegateEvent(name: string) {
+  if (eventListeners.has(name)) return;
+  eventListeners.add(name);
+  document.addEventListener(name, (e) => {
+    let node = e.target as any;
+    while (node && node !== document) {
+      const handler = node[`__shy_${name}`];
+      if (handler) {
+        handler(e);
+        if (e.cancelBubble) break;
+      }
+      node = node.parentNode;
+    }
+  });
+}
+
+export function h(tag: string | Function | any, props: any, ...children: any[]) {
+  if (typeof tag === "function") {
+    const result = tag({ ...props, children });
+    // If the component returns a function, it's a reactive thunk (like Suspense/ErrorBoundary)
+    if (typeof result === "function" && !result.$$isShy) {
+      return result;
+    }
+    return result;
+  }
+
+  const isSvg = SVG_TAGS.has(tag) || (props && props.xmlns === SVG_NAMESPACE);
+  let el: Element;
+  const cacheKey = isSvg ? `svg:${tag}` : tag;
+  let cached = templateCache.get(cacheKey);
+  if (!cached) {
     cached = (isSvg ? document.createElementNS(SVG_NAMESPACE, tag) : document.createElement(tag)) as Element;
     templateCache.set(cacheKey, cached);
-    }
-    el = cached!.cloneNode(false) as Element;
+  }
+  el = cached!.cloneNode(false) as Element;
 
-    if (props) {
+  if (props) {
     for (const key in props) {
       if (key === "ref" && typeof props[key] === "function") {
         props[key](el);
-      } else if (key.startsWith("on") && key.toLowerCase() in window) {
-        const event = key.slice(2).toLowerCase();
-        el.addEventListener(event, props[key]);
       } else if (key.startsWith("on")) {
-        const event = key.slice(2).toLowerCase();
-        el.addEventListener(event, props[key]);
+        const name = key.slice(2).toLowerCase();
+        if (DELEGATED_EVENTS.has(name)) {
+          (el as any)[`__shy_${name}`] = props[key];
+          delegateEvent(name);
+        } else {
+          el.addEventListener(name, props[key]);
+        }
       } else {
         if (typeof props[key] === "function") {
           eff(() => setAttribute(el, key, props[key]()));
@@ -49,11 +76,11 @@ export function h(tag: string | Function | any, props: any, ...children: any[]) 
         }
       }
     }
-    }
+  }
 
-    for (const child of children) {
+  for (const child of children) {
     appEl(el, child, isSvg);
-    }
+  }
 
-    return el;
+  return el;
 }

@@ -1,6 +1,27 @@
 export type EffectFn = () => void;
 
 export let currentEffect: EffectFn | null = null;
+let errorHandlers: ((err: any) => void)[] = [];
+
+export function pushErrorHandler(handler: (err: any) => void) {
+  errorHandlers.push(handler);
+}
+
+export function popErrorHandler() {
+  errorHandlers.pop();
+}
+
+export function runInErrorHandler(fn: () => void) {
+  try {
+    fn();
+  } catch (err) {
+    if (errorHandlers.length > 0) {
+      errorHandlers[errorHandlers.length - 1](err);
+    } else {
+      console.error("SHy.js: Uncaught error in effect", err);
+    }
+  }
+}
 
 export function setCurrentEffect(v: EffectFn | null) {
     currentEffect = v;
@@ -9,7 +30,13 @@ export function setCurrentEffect(v: EffectFn | null) {
 export const effectDependencies = new WeakMap<EffectFn, Set<Set<EffectFn>>>();
 export const effectCleanups = new WeakMap<EffectFn, Set<() => void>>();
 export const pendingEffects = new Set<EffectFn>();
+export const transitionEffects = new Set<EffectFn>();
 export let microtaskQueued = false;
+export let isTransitioning = false;
+
+export function setTransitioning(v: boolean) {
+    isTransitioning = v;
+}
 
 export function setMicrotaskQueued(v: any) {
     microtaskQueued = v;
@@ -34,17 +61,31 @@ export function cleanupEffect(effect: EffectFn) {
 
 export function notifyEffect(subscriber: EffectFn) {
     if ((subscriber as any).$$isMemo) {
-    subscriber();
+    runInErrorHandler(() => subscriber());
     } else {
-    pendingEffects.add(subscriber);
+    if (isTransitioning) {
+        transitionEffects.add(subscriber);
+    } else {
+        pendingEffects.add(subscriber);
+    }
+
     if (!microtaskQueued) {
       setMicrotaskQueued(true);
       Promise.resolve().then(() => {
         setMicrotaskQueued(false);
         const effectsToRun = Array.from(pendingEffects);
         pendingEffects.clear();
-        for (const eff of effectsToRun) {
-          eff();
+        for (const effToRun of effectsToRun) {
+          runInErrorHandler(() => effToRun());
+        }
+        
+        // Transition effects run after normal effects
+        if (transitionEffects.size > 0) {
+            const transEffectsToRun = Array.from(transitionEffects);
+            transitionEffects.clear();
+            for (const effToRun of transEffectsToRun) {
+                runInErrorHandler(() => effToRun());
+            }
         }
       });
     }
