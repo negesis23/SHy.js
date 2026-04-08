@@ -1,9 +1,14 @@
-export type EffectFn = () => void;
+export interface EffectNode {
+  (): void;
+  $$isMemo?: boolean;
+}
+
+export type EffectFn = EffectNode;
 
 export let currentEffect: EffectFn | null = null;
-let errorHandlers: ((err: any) => void)[] = [];
+let errorHandlers: ((err: unknown) => void)[] = [];
 
-export function pushErrorHandler(handler: (err: any) => void) {
+export function pushErrorHandler(handler: (err: unknown) => void) {
   errorHandlers.push(handler);
 }
 
@@ -38,7 +43,7 @@ export function setTransitioning(v: boolean) {
     isTransitioning = v;
 }
 
-export function setMicrotaskQueued(v: any) {
+export function setMicrotaskQueued(v: boolean) {
     microtaskQueued = v;
 }
 
@@ -60,7 +65,7 @@ export function cleanupEffect(effect: EffectFn) {
 }
 
 export function notifyEffect(subscriber: EffectFn) {
-    if ((subscriber as any).$$isMemo) {
+    if (subscriber.$$isMemo) {
     runInErrorHandler(() => subscriber());
     } else {
     if (isTransitioning) {
@@ -73,19 +78,18 @@ export function notifyEffect(subscriber: EffectFn) {
       setMicrotaskQueued(true);
       Promise.resolve().then(() => {
         setMicrotaskQueued(false);
-        const effectsToRun = Array.from(pendingEffects);
-        pendingEffects.clear();
-        for (const effToRun of effectsToRun) {
+        // Direct iteration to avoid Array.from allocation
+        for (const effToRun of pendingEffects) {
           runInErrorHandler(() => effToRun());
         }
+        pendingEffects.clear();
         
         // Transition effects run after normal effects
         if (transitionEffects.size > 0) {
-            const transEffectsToRun = Array.from(transitionEffects);
-            transitionEffects.clear();
-            for (const effToRun of transEffectsToRun) {
+            for (const effToRun of transitionEffects) {
                 runInErrorHandler(() => effToRun());
             }
+            transitionEffects.clear();
         }
       });
     }

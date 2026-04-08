@@ -18,7 +18,7 @@ export function s<T>(initialValue: T): [() => T, (v: T | ((prev: T) => T)) => vo
     };
 
     const set = (newValue: T | ((prev: T) => T)) => {
-    const nextValue = typeof newValue === "function" ? (newValue as any)(value) : newValue;
+    const nextValue = typeof newValue === "function" ? (newValue as (prev: T) => T)(value) : newValue;
     if (nextValue !== value) {
       value = nextValue;
       const subs = Array.from(subscribers);
@@ -30,3 +30,5 @@ export function s<T>(initialValue: T): [() => T, (v: T | ((prev: T) => T)) => vo
 
     return [get, set];
 }
+
+export const createSignal = s;

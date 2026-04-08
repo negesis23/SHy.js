@@ -7,7 +7,8 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsup src/index.ts --format esm,cjs --dts --minify",
-    "dev": "tsup src/index.ts --format esm,cjs --watch"
+    "dev": "tsup src/index.ts --format esm,cjs --watch",
+    "test": "vitest run"
   },
   "devDependencies": {
     "tsup": "^8.5.1",
