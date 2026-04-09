@@ -1,0 +1,11 @@
+{
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "features": {},
+  "customizations": {
+    "codespaces": {
+      "permissions": {
+        "security-events": "read"
+      }
+    }
+  }
+}
