@@ -8,7 +8,6 @@ export function Suspense(props: { fallback: any, children: any }) {
   const promises = new Set<Promise<any>>();
 
   const register = (promise: Promise<any>) => {
-    console.log("Registering promise!", promises.size);
     if (promises.has(promise)) return;
     promises.add(promise);
     setLoading(true);

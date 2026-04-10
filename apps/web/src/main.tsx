@@ -125,7 +125,7 @@ function App() {
       <section>
         <h2>3. Error Boundaries</h2>
         <ErrorBoundary fallback={(err) => <div className="error-box">Caught by Boundary: {err.message}</div>}>
-          <BuggyComponent />
+          {() => <BuggyComponent />}
         </ErrorBoundary>
       </section>
 
