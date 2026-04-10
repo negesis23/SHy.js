@@ -1,5 +1,5 @@
 import { eff, off, ut } from "../reactivity/index";
-import { appEl } from "../runtime/reconciler";
+import { appEl, hydrationContext } from "../runtime/reconciler";
 import { s } from "../reactivity/signal";
 
 export function Index<T>(props: { each: T[] | (() => T[]); children: [(item: () => T, index: number) => any] }) {
@@ -9,13 +9,15 @@ export function Index<T>(props: { each: T[] | (() => T[]); children: [(item: () 
   };
 }
 
-export function handleIndex(parent: Element | DocumentFragment | Node, child: any, isSvg: boolean) {
+export function handleIndex(parent: Element | DocumentFragment | Node, child: any, isSvg: boolean, onNodes?: (nodes: Node[]) => void) {
   const props = child.props;
   const getList = typeof props.each === "function" ? props.each : () => props.each;
   const renderItem = props.children[0];
 
   const marker = document.createComment("IndexMarker");
   parent.appendChild(marker);
+  
+  if (onNodes) onNodes([marker]);
 
   let renderedNodes: { nodes: Node[]; dispose: () => void; itemSignal: (v: any) => void }[] = [];
 
@@ -36,34 +38,28 @@ export function handleIndex(parent: Element | DocumentFragment | Node, child: an
           const subscribers = new Set<any>();
           return [
             () => {
-              // Simple internal signal for index items
               return val;
             },
             (v: any) => {
               val = typeof v === 'function' ? v(val) : v;
-              // We rely on the internal eff in the rendered item
             }
           ];
         })();
         
-        // Actually, let's use a real signal for simplicity and correctness
-        const frag = document.createDocumentFragment();
-        let dispose!: () => void;
-        
-        // We need a way to update the item without re-rendering the whole row if possible,
-        // but Index usually re-renders if the item signal is used inside.
-        // For Index optimization, we pass a signal-like getter.
-        
-        // Let's use the real signal from shy
         const [itemSignal, setItemSignal] = s(list[i]);
 
+        const frag = document.createDocumentFragment();
+        let dispose!: () => void;
+        let itemNodes: Node[] = [];
         ut(() => {
           const el = renderItem(itemSignal, i);
-          appEl(frag, el, isSvg);
+          appEl(frag, el, isSvg, (nodes) => {
+             itemNodes = nodes;
+             if (renderedNodes[i]) renderedNodes[i].nodes = nodes;
+          });
           dispose = () => { /* empty since no outer eff */ };
         });
         
-        const itemNodes = Array.from(frag.childNodes);
         marker.parentNode?.insertBefore(frag, marker);
         renderedNodes.push({ nodes: itemNodes, dispose, itemSignal: setItemSignal });
       }

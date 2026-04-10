@@ -1,5 +1,11 @@
-import { setAttribute, appEl } from "./reconciler";
+import { setAttribute, appEl, hydrationContext } from "./reconciler";
 import { eff } from "../reactivity/index";
+
+// Registry for SSR implementation to avoid static imports
+let ssrImplementation: any | null = null;
+export function setSSRImplementation(impl: any | null) {
+  ssrImplementation = impl;
+}
 
 export const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 export const SVG_TAGS = new Set([
@@ -17,12 +23,12 @@ export const SVG_TAGS = new Set([
 const DELEGATED_EVENTS = new Set(["click", "input", "change", "submit", "focus", "blur", "keydown", "keyup", "keypress"]);
 
 export const templateCache = new Map<string, Element>();
-
 const eventListeners = new Set<string>();
 
 function delegateEvent(name: string) {
   if (eventListeners.has(name)) return;
   eventListeners.add(name);
+
   document.addEventListener(name, (e) => {
     let node = e.target as any;
     while (node && node !== document) {
@@ -37,9 +43,13 @@ function delegateEvent(name: string) {
 }
 
 export function h(tag: string | Function | any, props: any, ...children: any[]) {
+  if (ssrImplementation || (typeof document === "undefined" && (globalThis as any).__SHY_SSR_H__)) {
+    const impl = ssrImplementation || (globalThis as any).__SHY_SSR_H__;
+    return impl(tag, props, ...children);
+  }
+
   if (typeof tag === "function") {
     const result = tag({ ...props, children });
-    // If the component returns a function, it's a reactive thunk (like Suspense/ErrorBoundary)
     if (typeof result === "function" && !result.$$isShy) {
       return result;
     }
@@ -47,14 +57,18 @@ export function h(tag: string | Function | any, props: any, ...children: any[]) 
   }
 
   const isSvg = SVG_TAGS.has(tag) || (props && props.xmlns === SVG_NAMESPACE);
-  let el: Element;
-  const cacheKey = isSvg ? `svg:${tag}` : tag;
-  let cached = templateCache.get(cacheKey);
-  if (!cached) {
-    cached = (isSvg ? document.createElementNS(SVG_NAMESPACE, tag) : document.createElement(tag)) as Element;
-    templateCache.set(cacheKey, cached);
+  let el: Element | undefined;
+
+  if (!el) {
+    const cacheKey = isSvg ? `svg:${tag}` : tag;
+    let cached = templateCache.get(cacheKey);
+
+    if (!cached) {
+      cached = (isSvg ? document.createElementNS(SVG_NAMESPACE, tag) : document.createElement(tag)) as Element;
+      templateCache.set(cacheKey, cached);
+    }
+    el = cached!.cloneNode(false) as Element;
   }
-  el = cached!.cloneNode(false) as Element;
 
   if (props) {
     for (const key in props) {
@@ -71,14 +85,19 @@ export function h(tag: string | Function | any, props: any, ...children: any[]) 
       } else if (key.startsWith("on")) {
         const name = key.slice(2).toLowerCase();
         if (DELEGATED_EVENTS.has(name)) {
-          (el as any)[`__shy_${name}`] = props[key];
+          let handlers = eventRegistry.get(el);
+          if (!handlers) {
+            handlers = {};
+            eventRegistry.set(el, handlers);
+          }
+          handlers[name] = props[key];
           delegateEvent(name);
         } else {
           el.addEventListener(name, props[key]);
         }
       } else {
         if (typeof props[key] === "function") {
-          eff(() => setAttribute(el, key, props[key]()));
+          eff(() => setAttribute(el!, key, props[key]()));
         } else {
           setAttribute(el, key, props[key]);
         }

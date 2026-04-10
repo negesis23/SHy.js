@@ -4,7 +4,7 @@ import { handleIndex } from "../components/Index";
 
 export function setAttribute(el: Element, key: string, value: any) {
     if (key === "className") {
-    el.setAttribute("class", value);
+        el.setAttribute("class", value);
     } else if (key === "classList" && typeof value === "object") {
         for (const name in value) {
             if (value[name]) el.classList.add(name);
@@ -20,21 +20,27 @@ export function setAttribute(el: Element, key: string, value: any) {
         }
         (el as any)._prevStyle = value;
     } else if (value == null || value === false) {
-    el.removeAttribute(key);
+        el.removeAttribute(key);
     } else {
-    if (el instanceof SVGElement) {
-      el.setAttribute(key, value);
-    } else {
-      if (key in el) {
-        (el as any)[key] = value;
-      } else {
-        el.setAttribute(key, value);
-      }
-    }
+        if (typeof SVGElement !== "undefined" && el instanceof SVGElement) {
+            el.setAttribute(key, value);
+        } else {
+            if (key in el) {
+                (el as any)[key] = value;
+            } else {
+                el.setAttribute(key, value);
+            }
+        }
     }
 }
 
-export function appEl(parent: Element | DocumentFragment | Node, child: any, isSvg: boolean) {
+export let hydrationContext: any = null;
+
+export function setHydrationContext(ctx: typeof hydrationContext) {
+    hydrationContext = ctx;
+}
+
+export function appEl(parent: Element | DocumentFragment | Node, child: any, isSvg: boolean, onNodes?: (nodes: Node[]) => void) {
     if (child == null || child === false) return;
 
     if (child && child.$$isFor) {
@@ -48,58 +54,64 @@ export function appEl(parent: Element | DocumentFragment | Node, child: any, isS
     }
 
     if (typeof child === "function") {
-    const marker = document.createComment("marker");
-    parent.appendChild(marker);
-    let currentNodes: Node[] = [];
+        const marker = document.createComment("marker");
+        parent.appendChild(marker);
+        let currentNodes: Node[] = [];
 
-    eff(() => {
-      let val = child();
-      // Handle nested thunks (e.g. Suspense inside prv)
-      while (typeof val === "function" && !val.$$isShy) {
-        val = val();
-      }
-      
-      const isPrimitive = typeof val === "string" || typeof val === "number" || typeof val === "boolean";
-      if (isPrimitive && currentNodes.length === 1 && currentNodes[0].nodeType === Node.TEXT_NODE) {
-        currentNodes[0].nodeValue = String(val);
-        return;
-      }
+        eff(() => {
+            let val = child();
+            while (typeof val === "function" && !val.$$isShy) {
+                val = val();
+            }
 
-      for (const n of currentNodes) {
-        n.parentNode?.removeChild(n);
-      }
-      currentNodes = [];
-      
-      if (val != null && val !== false) {
-        if (val instanceof Node) {
-          currentNodes.push(val);
-          marker.parentNode?.insertBefore(val, marker);
-        } else if (Array.isArray(val)) {
-          const frag = document.createDocumentFragment();
-          for (const v of val) {
-            appEl(frag, v, isSvg);
-          }
-          currentNodes = Array.from(frag.childNodes);
-          marker.parentNode?.insertBefore(frag, marker);
-        } else if (val && val.$$isFor) {
-          const frag = document.createDocumentFragment();
-          appEl(frag, val, isSvg);
-          currentNodes = Array.from(frag.childNodes);
-          marker.parentNode?.insertBefore(frag, marker);
-        } else {
-          const text = document.createTextNode(String(val));
-          currentNodes.push(text);
-          marker.parentNode?.insertBefore(text, marker);
-        }
-      }
-    });
-    } else if (child instanceof Node) {
-    parent.appendChild(child);
+            const isPrimitive = typeof val === "string" || typeof val === "number" || typeof val === "boolean";
+            if (isPrimitive && currentNodes.length === 1 && currentNodes[0].nodeType === Node.TEXT_NODE) {
+                currentNodes[0].nodeValue = String(val);
+                if (onNodes) onNodes(currentNodes);
+                return;
+            }
+
+            for (const n of currentNodes) {
+                n.parentNode?.removeChild(n);
+            }
+            currentNodes = [];
+
+            if (val != null && val !== false) {
+                if (typeof Node !== "undefined" && val instanceof Node) {
+                    currentNodes.push(val);
+                    marker.parentNode?.insertBefore(val, marker);
+                } else if (Array.isArray(val)) {
+                    const frag = document.createDocumentFragment();
+                    for (const v of val) {
+                        appEl(frag, v, isSvg);
+                    }
+                    currentNodes = Array.from(frag.childNodes);
+                    marker.parentNode?.insertBefore(frag, marker);
+                } else if (val && val.$$isFor) {
+                    const frag = document.createDocumentFragment();
+                    appEl(frag, val, isSvg);
+                    currentNodes = Array.from(frag.childNodes);
+                    marker.parentNode?.insertBefore(frag, marker);
+                } else {
+                    const text = document.createTextNode(String(val));
+                    currentNodes.push(text);
+                    marker.parentNode?.insertBefore(text, marker);
+                }
+            }
+            if (onNodes) onNodes(currentNodes);
+        });
+    } else if (typeof Node !== "undefined" && child instanceof Node) {
+        parent.appendChild(child);
+        if (onNodes) onNodes([child]);
     } else if (Array.isArray(child)) {
-    for (const c of child) {
-      appEl(parent, c, isSvg);
-    }
+        const arrNodes: Node[] = [];
+        for (const c of child) {
+            appEl(parent, c, isSvg, (n) => arrNodes.push(...n));
+        }
+        if (onNodes) onNodes(arrNodes);
     } else {
-    parent.appendChild(document.createTextNode(String(child)));
+        const text = document.createTextNode(String(child));
+        parent.appendChild(text);
+        if (onNodes) onNodes([text]);
     }
 }

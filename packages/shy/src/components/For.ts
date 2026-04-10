@@ -1,11 +1,11 @@
-import { eff, off, ut } from "../reactivity";
-import { appEl } from "../runtime/reconciler";
+import { eff, off, ut } from "../reactivity/index";
+import { appEl, hydrationContext } from "../runtime/reconciler";
 
 export function For<T>(props: { each: T[] | (() => T[]); fallback?: any; children: [(item: T, index: () => number) => any] }) {
     return { $$isFor: true, props };
 }
 
-export function handleFor(parent: Element | DocumentFragment | Node, child: any, isSvg: boolean) {
+export function handleFor(parent: Element | DocumentFragment | Node, child: any, isSvg: boolean, onNodes?: (nodes: Node[]) => void) {
     const props = child.props;
     const getList = typeof props.each === "function" ? props.each : () => props.each;
     const renderItem = props.children[0];
@@ -13,6 +13,8 @@ export function handleFor(parent: Element | DocumentFragment | Node, child: any,
 
     const marker = document.createComment("ForMarker");
     parent.appendChild(marker);
+    
+    if (onNodes) onNodes([marker]);
 
     let renderedItemsMap = new Map<any, { nodes: Node[]; dispose: () => void }>();
     let isFallback = false;
@@ -50,14 +52,14 @@ export function handleFor(parent: Element | DocumentFragment | Node, child: any,
           ut(() => {
             fallbackDispose = eff(() => {
               const fbChild = typeof fallback === "function" ? fallback() : fallback;
-              appEl(frag, fbChild, isSvg);
+              appEl(frag, fbChild, isSvg, (nodes) => {
+                  fallbackNodes = nodes;
+              });
             });
           });
-          fallbackNodes = Array.from(frag.childNodes);
           marker.parentNode?.insertBefore(frag, marker);
         }
       } else {
-        // O(1) insertion optimizations: only move nodes if they are out of place
         let lastNode: Node | null = marker;
         for (let i = list.length - 1; i >= 0; i--) {
           const item = list[i];
@@ -67,7 +69,6 @@ export function handleFor(parent: Element | DocumentFragment | Node, child: any,
             const firstExistingNode = existing.nodes[0];
             const lastExistingNode = existing.nodes[existing.nodes.length - 1];
             
-            // Check if it's already in the correct position (immediately preceding lastNode)
             if (lastExistingNode && lastExistingNode.nextSibling !== lastNode) {
                for (const node of existing.nodes) {
                  lastNode!.parentNode?.insertBefore(node, lastNode);
@@ -79,13 +80,17 @@ export function handleFor(parent: Element | DocumentFragment | Node, child: any,
           } else {
             const frag = document.createDocumentFragment();
             let dispose!: () => void;
+            let itemNodes: Node[] = [];
             ut(() => {
               dispose = eff(() => {
                 const el = renderItem(item, () => list.indexOf(item));
-                appEl(frag, el, isSvg);
+                appEl(frag, el, isSvg, (nodes) => {
+                    itemNodes = nodes;
+                    const existingMapItem = newRenderedItemsMap.get(item);
+                    if (existingMapItem) existingMapItem.nodes = nodes;
+                });
               });
             });
-            const itemNodes = Array.from(frag.childNodes);
             if (itemNodes.length > 0) {
                lastNode!.parentNode?.insertBefore(frag, lastNode);
                lastNode = itemNodes[0];

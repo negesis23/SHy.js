@@ -17,6 +17,14 @@ const SuspenseContext = ctx<{
 
 export { SuspenseContext };
 
+let ssrResources: Map<string, any> | null = null;
+let resourceCounter = 0;
+
+export function setSSRResources(map: Map<string, any> | null) {
+  ssrResources = map;
+  resourceCounter = 0;
+}
+
 export function res<T, S = true>(
   fetcher: S extends true ? () => Promise<T> : (source: S) => Promise<T>,
   source?: () => S
@@ -39,13 +47,16 @@ export function res<T, S = true>(
     promise.then(
       (v) => {
         if (currentPromise === promise) {
-          setData(() => v);
+          setData(v);
           setLoading(false);
+          if (ssrResources) {
+              // We need an ID for SSR. This is still problematic with global counter.
+          }
         }
       },
       (err: unknown) => {
         if (currentPromise === promise) {
-          setError(() => err);
+          setError(err);
           setLoading(false);
         }
       }
@@ -67,10 +78,7 @@ export function res<T, S = true>(
       if (suspense) {
         suspense.register(currentPromise);
         (currentPromise as any).$$shyRegistered = true;
-        throw currentPromise;
       }
-      // If we are in a transition, we should also suspend
-      // but without a Suspense boundary, maybe we just return data() ?
     }
     return data();
   }) as Resource<T>;
