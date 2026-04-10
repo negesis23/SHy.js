@@ -43,7 +43,20 @@ export function h(tag: any, props: any, ...children: any[]): any {
       if (typeof value === "function") {
           const val = value();
           if (val != null && val !== false) {
-              attrs += ` ${attrName}="${escapeHtml(String(val))}"`;
+              if (key === "style" && typeof val === "object") {
+                  const styleStr = Object.entries(val)
+                      .map(([k, v]) => `${k}:${v}`)
+                      .join(";");
+                  attrs += ` style="${escapeHtml(styleStr)}"`;
+              } else if (key === "classList" && typeof val === "object") {
+                  const classes = Object.entries(val)
+                      .filter(([_, v]) => v)
+                      .map(([k, _]) => k)
+                      .join(" ");
+                  if (classes) attrs += ` class="${escapeHtml(classes)}"`;
+              } else {
+                  attrs += ` ${attrName}="${escapeHtml(String(val))}"`;
+              }
           }
       } else if (value != null && value !== false) {
           if (key === "style" && typeof value === "object") {

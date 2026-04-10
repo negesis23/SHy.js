@@ -24,6 +24,7 @@ const DELEGATED_EVENTS = new Set(["click", "input", "change", "submit", "focus",
 
 export const templateCache = new Map<string, Element>();
 const eventListeners = new Set<string>();
+export const eventRegistry = new WeakMap<Element, Record<string, Function>>();
 
 function delegateEvent(name: string) {
   if (eventListeners.has(name)) return;
@@ -32,9 +33,9 @@ function delegateEvent(name: string) {
   document.addEventListener(name, (e) => {
     let node = e.target as any;
     while (node && node !== document) {
-      const handler = node[`__shy_${name}`];
-      if (handler) {
-        handler(e);
+      const handlers = eventRegistry.get(node);
+      if (handlers && handlers[name]) {
+        handlers[name](e);
         if (e.cancelBubble) break;
       }
       node = node.parentNode;
