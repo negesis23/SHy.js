@@ -58,10 +58,9 @@ export function handleIndex(parent: Element | DocumentFragment | Node, child: an
         const [itemSignal, setItemSignal] = s(list[i]);
 
         ut(() => {
-          dispose = eff(() => {
-            const el = renderItem(itemSignal, i);
-            appEl(frag, el, isSvg);
-          });
+          const el = renderItem(itemSignal, i);
+          appEl(frag, el, isSvg);
+          dispose = () => { /* empty since no outer eff */ };
         });
         
         const itemNodes = Array.from(frag.childNodes);

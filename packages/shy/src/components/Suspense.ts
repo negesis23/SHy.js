@@ -1,13 +1,14 @@
-import { prv } from "../context";
+import { prv } from "../context/index";
 import { s } from "../reactivity/signal";
 import { SuspenseContext } from "../reactivity/resource";
-import { pushErrorHandler, popErrorHandler } from "../reactivity/core";
+import { pushErrorHandler, popErrorHandler, runInErrorHandler } from "../reactivity/core";
 
 export function Suspense(props: { fallback: any, children: any }) {
   const [loading, setLoading] = s(false);
   const promises = new Set<Promise<any>>();
 
   const register = (promise: Promise<any>) => {
+    console.log("Registering promise!", promises.size);
     if (promises.has(promise)) return;
     promises.add(promise);
     setLoading(true);
@@ -24,23 +25,24 @@ export function Suspense(props: { fallback: any, children: any }) {
       return props.fallback;
     }
     
-    pushErrorHandler((err) => {
-      if (err instanceof Promise) {
-        register(err);
-      } else {
-        throw err;
-      }
-    });
-
-    let result;
-    try {
-      result = prv(SuspenseContext, { register }, () => {
-        return typeof props.children === "function" ? props.children() : props.children;
+    return prv(SuspenseContext, { register }, () => {
+      pushErrorHandler((err) => {
+        if (err instanceof Promise) {
+          register(err);
+        } else {
+          throw err;
+        }
       });
-    } finally {
+      let result;
+      runInErrorHandler(() => {
+        result = Array.isArray(props.children) ? props.children[0] : props.children;
+        // Evaluate thunks so the error handler and context are active during child setup
+        while (typeof result === "function" && !result.$$isShy) {
+          result = result();
+        }
+      });
       popErrorHandler();
-    }
-    
-    return result;
+      return result;
+    });
   };
 }

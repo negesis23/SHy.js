@@ -40,7 +40,7 @@ export const provide = prv;
 
 export function inj<T>(context: Context<T>): T {
     if (contextProviderMap.has(context.id)) {
-    return contextProviderMap.get(context.id) as T;
+        return contextProviderMap.get(context.id) as T;
     }
     return context.defaultValue as T;
 }

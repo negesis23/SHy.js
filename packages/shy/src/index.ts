@@ -6,4 +6,5 @@ export * from "./components/ErrorBoundary";
 export * from "./components/Suspense";
 export * from "./components/Portal";
 export * from "./components/Dynamic";
+export * from "./components/lazy";
 export * from "./context/index";

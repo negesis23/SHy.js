@@ -42,6 +42,14 @@ export function popErrorHandler() {
   errorHandlers.pop();
 }
 
+export function getErrorHandlers() {
+  return [...errorHandlers];
+}
+
+export function setErrorHandlers(handlers: ((err: unknown) => void)[]) {
+  errorHandlers = [...handlers];
+}
+
 export function runInErrorHandler(fn: () => void) {
   try {
     fn();
@@ -50,7 +58,9 @@ export function runInErrorHandler(fn: () => void) {
       errorHandlers[errorHandlers.length - 1](err);
     } else {
       if (err instanceof Promise) {
-        console.error("SHy.js: Uncaught Promise (missing Suspense boundary)", err);
+        if (!(err as any).$$shyRegistered) {
+           console.error("SHy.js: Uncaught Promise (missing Suspense boundary)", err);
+        }
       } else {
         console.error("SHy.js: Uncaught error in effect", err);
       }
@@ -222,7 +232,7 @@ export function notifyEffect(subscriber: EffectFn) {
           current.prevPending = null;
           current.nextPending = null;
           runInErrorHandler(() => current!());
-          current = next;
+          current = next as any;
         }
         
         // Flush Transition Queue
@@ -236,7 +246,7 @@ export function notifyEffect(subscriber: EffectFn) {
             currTrans.prevTransition = null;
             currTrans.nextTransition = null;
             runInErrorHandler(() => currTrans!());
-            currTrans = next;
+            currTrans = next as any;
           }
         }
       });

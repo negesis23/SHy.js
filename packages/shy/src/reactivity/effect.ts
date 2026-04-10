@@ -1,25 +1,32 @@
-import { currentEffect, setCurrentEffect, cleanupEffect, runInErrorHandler } from "./core";
+import { currentEffect, setCurrentEffect, cleanupEffect, runInErrorHandler, getErrorHandlers, setErrorHandlers } from "./core";
 import { getContextProviderMap, setContextProviderMap } from "../context/index";
 
 export function eff(fn: () => void | (() => void)): () => void {
     const context = getContextProviderMap();
+    const capturedErrorHandlers = getErrorHandlers();
+    
     const effect = () => {
         cleanupEffect(effect);
         const prevEffect = currentEffect;
         const prevContext = getContextProviderMap();
+        const prevErrorHandlers = getErrorHandlers();
+        
         setCurrentEffect(effect);
         setContextProviderMap(context);
-        runInErrorHandler(() => {
-            try {
+        setErrorHandlers(capturedErrorHandlers);
+        
+        try {
+            runInErrorHandler(() => {
                 const cleanup = fn();
                 if (typeof cleanup === 'function') {
                     off(cleanup);
                 }
-            } finally {
-                setCurrentEffect(prevEffect);
-                setContextProviderMap(prevContext);
-            }
-        });
+            });
+        } finally {
+            setCurrentEffect(prevEffect);
+            setContextProviderMap(prevContext);
+            setErrorHandlers(prevErrorHandlers);
+        }
     };
 
     if (currentEffect) {

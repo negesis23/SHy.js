@@ -34,7 +34,7 @@ function triggerProperty(target: object, key: string | symbol) {
   }
 }
 
-function isObject(val: unknown): val is object {
+function isObject(val: unknown): val is Record<string, any> {
   return val !== null && typeof val === "object";
 }
 

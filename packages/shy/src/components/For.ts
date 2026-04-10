@@ -34,7 +34,11 @@ export function handleFor(parent: Element | DocumentFragment | Node, child: any,
 
       for (const [item, rendered] of renderedItemsMap.entries()) {
         if (!newItemsSet.has(item)) {
-          for (const node of rendered.nodes) node.parentNode?.removeChild(node);
+          for (const node of rendered.nodes) {
+             if (node.parentNode) {
+                node.parentNode.removeChild(node);
+             }
+          }
           rendered.dispose();
         }
       }

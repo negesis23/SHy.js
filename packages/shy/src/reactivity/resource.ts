@@ -1,6 +1,6 @@
 import { s } from "./signal";
 import { currentEffect, notifyEffect } from "./core";
-import { ctx, inj } from "../context";
+import { ctx, inj } from "../context/index";
 import { eff } from "./effect";
 
 export interface Resource<T> {
@@ -66,6 +66,7 @@ export function res<T, S = true>(
     if (loading() && currentPromise) {
       if (suspense) {
         suspense.register(currentPromise);
+        (currentPromise as any).$$shyRegistered = true;
         throw currentPromise;
       }
       // If we are in a transition, we should also suspend

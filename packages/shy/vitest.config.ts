@@ -5,4 +5,8 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
   },
+  esbuild: {
+    jsxFactory: 'h',
+    jsxFragment: 'Fragment'
+  }
 });

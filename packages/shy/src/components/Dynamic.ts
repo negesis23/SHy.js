@@ -2,7 +2,7 @@ import { h } from "../runtime/jsx";
 
 export function Dynamic(props: { component: any, [key: string]: any }) {
   return () => {
-    const { component, ...rest } = props;
+    const { component, children, ...rest } = props;
     let Tag = typeof component === "function" ? component() : component;
     
     // If calling component() returned a Node or Array, it was already a rendered component
@@ -11,6 +11,6 @@ export function Dynamic(props: { component: any, [key: string]: any }) {
     }
     
     if (!Tag) return null;
-    return h(Tag, rest);
+    return h(Tag, rest, children);
   };
 }
