@@ -19,40 +19,32 @@ export function Suspense(props: { fallback: any, children: any }) {
     });
   };
 
-  let cachedChildren: any = null;
-  let childrenEvaluated = false;
-
   return () => {
-    if (!childrenEvaluated) {
-      cachedChildren = prv(SuspenseContext, { register }, () => {
-        let result: any;
-        pushErrorHandler((err) => {
-          if (err instanceof Promise) {
-            register(err);
-          } else {
-            throw err;
-          }
-        });
-        try {
-          runInErrorHandler(() => {
-            result = Array.isArray(props.children) ? props.children[0] : props.children;
-            // Evaluate thunks so the error handler and context are active during child setup
-            while (typeof result === "function" && !result.$$isShy) {
-              result = result();
-            }
-          });
-          return result;
-        } finally {
-          popErrorHandler();
-        }
-      })();
-      childrenEvaluated = true;
-    }
-
     if (loading()) {
       return props.fallback;
     }
-
-    return cachedChildren;
+    
+    return prv(SuspenseContext, { register }, () => {
+      pushErrorHandler((err) => {
+        if (err instanceof Promise) {
+          register(err);
+        } else {
+          throw err;
+        }
+      });
+      try {
+        let result;
+        runInErrorHandler(() => {
+          result = Array.isArray(props.children) ? props.children[0] : props.children;
+          // Evaluate thunks so the error handler and context are active during child setup
+          while (typeof result === "function" && !result.$$isShy) {
+            result = result();
+          }
+        });
+        return result;
+      } finally {
+        popErrorHandler();
+      }
+    });
   };
 }

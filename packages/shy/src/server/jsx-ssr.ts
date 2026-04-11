@@ -20,7 +20,7 @@ export function setSSRContext(ctx: typeof ssrContext) {
   ssrContext = ctx;
 }
 
-class SafeHTML {
+export class SafeHTML {
   constructor(public html: string) {}
   toString() { return this.html; }
 }
@@ -47,7 +47,7 @@ export function h(tag: any, props: any, ...children: any[]): any {
                   const styleStr = Object.entries(val)
                       .map(([k, v]) => `${k}:${v}`)
                       .join(";");
-                  attrs += ` style="${escapeHtml(styleStr)}"`;
+                  attrs += ` ${attrName}="${escapeHtml(styleStr)}"`;
               } else if (key === "classList" && typeof val === "object") {
                   const classes = Object.entries(val)
                       .filter(([_, v]) => v)
@@ -95,7 +95,7 @@ export function h(tag: any, props: any, ...children: any[]): any {
   return new SafeHTML(html);
 }
 
-function renderChild(child: any): string {
+export function renderChild(child: any): string {
   if (child == null || child === false) return "";
 
   if (child instanceof SafeHTML) {

@@ -10,5 +10,5 @@ export * from "./components/lazy";
 export * from "./context/index";
 
 // SSR & Hydration
-export * from "./server/render";
+export { renderToString, renderToStringAsync } from "./server/render";
 export * from "./web/hydrate";

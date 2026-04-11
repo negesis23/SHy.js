@@ -1,6 +1,6 @@
-import { renderToString } from 'shy';
+import { renderToStringAsync } from 'shy';
 import { App } from './App';
 
-export function render(url: string) {
-  return renderToString(App);
+export async function render(url: string) {
+  return renderToStringAsync(App);
 }

@@ -1,4 +1,4 @@
-import { setAttribute, appEl, hydrationContext } from "./reconciler";
+import { setAttribute, appEl } from "./reconciler";
 import { eff } from "../reactivity/index";
 
 // Registry for SSR implementation to avoid static imports
@@ -58,18 +58,16 @@ export function h(tag: string | Function | any, props: any, ...children: any[]) 
   }
 
   const isSvg = SVG_TAGS.has(tag) || (props && props.xmlns === SVG_NAMESPACE);
-  let el: Element | undefined;
+  let el: Element;
 
-  if (!el) {
-    const cacheKey = isSvg ? `svg:${tag}` : tag;
-    let cached = templateCache.get(cacheKey);
-
-    if (!cached) {
-      cached = (isSvg ? document.createElementNS(SVG_NAMESPACE, tag) : document.createElement(tag)) as Element;
-      templateCache.set(cacheKey, cached);
-    }
-    el = cached!.cloneNode(false) as Element;
+  const cacheKey = isSvg ? `svg:${tag}` : tag;
+  let cached = templateCache.get(cacheKey);
+  
+  if (!cached) {
+    cached = (isSvg ? document.createElementNS(SVG_NAMESPACE, tag) : document.createElement(tag)) as Element;
+    templateCache.set(cacheKey, cached);
   }
+  el = cached!.cloneNode(false) as Element;
 
   if (props) {
     for (const key in props) {
@@ -98,7 +96,7 @@ export function h(tag: string | Function | any, props: any, ...children: any[]) 
         }
       } else {
         if (typeof props[key] === "function") {
-          eff(() => setAttribute(el!, key, props[key]()));
+          eff(() => setAttribute(el, key, props[key]()));
         } else {
           setAttribute(el, key, props[key]);
         }

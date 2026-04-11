@@ -2,7 +2,7 @@ import { eff, off, ut } from "../reactivity/index";
 import { handleFor } from "../components/For";
 import { handleIndex } from "../components/Index";
 
-export function setAttribute(el: Element, key: string, value: any) {
+export function setAttribute(el: any, key: string, value: any) {
     if (key === "className") {
         el.setAttribute("class", value);
     } else if (key === "classList" && typeof value === "object") {
@@ -13,10 +13,10 @@ export function setAttribute(el: Element, key: string, value: any) {
     } else if (key === "style" && typeof value === "object") {
         const prev = (el as any)._prevStyle || {};
         for (const k in prev) {
-            if (!(k in value)) (el as HTMLElement).style.removeProperty(k);
+            if (!(k in value)) (el as any).style.removeProperty(k);
         }
         for (const k in value) {
-            (el as HTMLElement).style.setProperty(k, value[k]);
+            (el as any).style.setProperty(k, value[k]);
         }
         (el as any)._prevStyle = value;
     } else if (value == null || value === false) {
@@ -34,29 +34,23 @@ export function setAttribute(el: Element, key: string, value: any) {
     }
 }
 
-export let hydrationContext: any = null;
-
-export function setHydrationContext(ctx: typeof hydrationContext) {
-    hydrationContext = ctx;
-}
-
-export function appEl(parent: Element | DocumentFragment | Node, child: any, isSvg: boolean, onNodes?: (nodes: Node[]) => void) {
+export function appEl(parent: any, child: any, isSvg: boolean, onNodes?: (nodes: any[]) => void) {
     if (child == null || child === false) return;
 
     if (child && child.$$isFor) {
-        handleFor(parent, child, isSvg);
+        handleFor(parent, child, isSvg, onNodes);
         return;
     }
 
     if (child && child.$$isIndex) {
-        handleIndex(parent, child, isSvg);
+        handleIndex(parent, child, isSvg, onNodes);
         return;
     }
 
     if (typeof child === "function") {
         const marker = document.createComment("marker");
         parent.appendChild(marker);
-        let currentNodes: Node[] = [];
+        let currentNodes: any[] = [];
 
         eff(() => {
             let val = child();
@@ -65,8 +59,12 @@ export function appEl(parent: Element | DocumentFragment | Node, child: any, isS
             }
 
             const isPrimitive = typeof val === "string" || typeof val === "number" || typeof val === "boolean";
-            if (isPrimitive && currentNodes.length === 1 && currentNodes[0].nodeType === Node.TEXT_NODE) {
-                currentNodes[0].nodeValue = String(val);
+            const TEXT_NODE = 3;
+            
+            if (isPrimitive && currentNodes.length === 1 && currentNodes[0].nodeType === TEXT_NODE) {
+                if (currentNodes[0].nodeValue !== String(val)) {
+                    currentNodes[0].nodeValue = String(val);
+                }
                 if (onNodes) onNodes(currentNodes);
                 return;
             }
@@ -81,21 +79,27 @@ export function appEl(parent: Element | DocumentFragment | Node, child: any, isS
                     currentNodes.push(val);
                     marker.parentNode?.insertBefore(val, marker);
                 } else if (Array.isArray(val)) {
-                    const frag = document.createDocumentFragment();
-                    for (const v of val) {
-                        appEl(frag, v, isSvg);
+                    if (typeof document !== "undefined") {
+                        const frag = document.createDocumentFragment();
+                        for (const v of val) {
+                            appEl(frag, v, isSvg);
+                        }
+                        currentNodes = Array.from(frag.childNodes);
+                        marker.parentNode?.insertBefore(frag, marker);
                     }
-                    currentNodes = Array.from(frag.childNodes);
-                    marker.parentNode?.insertBefore(frag, marker);
                 } else if (val && val.$$isFor) {
-                    const frag = document.createDocumentFragment();
-                    appEl(frag, val, isSvg);
-                    currentNodes = Array.from(frag.childNodes);
-                    marker.parentNode?.insertBefore(frag, marker);
+                    if (typeof document !== "undefined") {
+                        const frag = document.createDocumentFragment();
+                        appEl(frag, val, isSvg);
+                        currentNodes = Array.from(frag.childNodes);
+                        marker.parentNode?.insertBefore(frag, marker);
+                    }
                 } else {
-                    const text = document.createTextNode(String(val));
-                    currentNodes.push(text);
-                    marker.parentNode?.insertBefore(text, marker);
+                    if (typeof document !== "undefined") {
+                        const text = document.createTextNode(String(val));
+                        currentNodes.push(text);
+                        marker.parentNode?.insertBefore(text, marker);
+                    }
                 }
             }
             if (onNodes) onNodes(currentNodes);
@@ -104,14 +108,16 @@ export function appEl(parent: Element | DocumentFragment | Node, child: any, isS
         parent.appendChild(child);
         if (onNodes) onNodes([child]);
     } else if (Array.isArray(child)) {
-        const arrNodes: Node[] = [];
+        const arrNodes: any[] = [];
         for (const c of child) {
             appEl(parent, c, isSvg, (n) => arrNodes.push(...n));
         }
         if (onNodes) onNodes(arrNodes);
     } else {
-        const text = document.createTextNode(String(child));
-        parent.appendChild(text);
-        if (onNodes) onNodes([text]);
+        if (typeof document !== "undefined") {
+            const text = document.createTextNode(String(child));
+            parent.appendChild(text);
+            if (onNodes) onNodes([text]);
+        }
     }
 }

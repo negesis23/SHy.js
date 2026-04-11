@@ -43,8 +43,8 @@ app.get('*', async (c) => {
       render = (await import('./dist/server/entry-server.js')).render
     }
 
-    const appHtml = render(url)
-    const html = template.replace(`<!--app-html-->`, appHtml)
+    const appHtml = await render(url)
+    const html = template.replace('<div id="root"></div>', `<div id="root">${appHtml}</div>`)
 
     return c.html(html)
   } catch (e) {
